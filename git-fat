@@ -208,7 +208,7 @@ class GitFat(object):
             cmd = [
                 "aws",
                 "s3",
-                "sync",
+                "cp",
                 self.objdir + "/",
                 s3_bucket + "/"
             ]
@@ -217,7 +217,7 @@ class GitFat(object):
             cmd = [
                 "aws",
                 "s3",
-                "sync",
+                "cp",
                 s3_bucket + "/",
                 self.objdir + "/"
             ]
