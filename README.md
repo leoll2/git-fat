@@ -7,6 +7,16 @@ sudo curl -L https://raw.githubusercontent.com/leoll2/git-fat/master/git-fat -o 
 sudo chmod +x /usr/local/bin/git-fat
 ```
 
+## Integration Tests
+
+All test dependencies are packaged inside the supplied Dockerfile. To run the integration tests:
+
+```bash
+docker run --rm -it $(docker build -q .) bash test.sh
+```
+
+This executes git-fat against Minio (Mock S3) and a local RSYNC directory destination.
+
 ## Introduction
 
 Checking large binary files into a source repository (Git or otherwise) is a bad idea because repository size quickly becomes unreasonable.
