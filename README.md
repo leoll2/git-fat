@@ -1,22 +1,35 @@
-# Introduction
+# git-fat
+
+## Quick Start
+
+```bash
+sudo curl -L https://raw.githubusercontent.com/leoll2/git-fat/master/git-fat -o /usr/local/bin/git-fat
+sudo chmod +x /usr/local/bin/git-fat
+```
+
+## Introduction
+
 Checking large binary files into a source repository (Git or otherwise) is a bad idea because repository size quickly becomes unreasonable.
 Even if the instantaneous working tree stays manageable, preserving repository integrity requires all binary files in the entire project history, which given the typically poor compression of binary diffs, implies that the repository size will become impractically large.
 Some people recommend checking binaries into different repositories or even not versioning them at all, but these are not satisfying solutions for most workflows.
 
 ## Features of `git-fat`
-* clones of the source repository are small and fast because no binaries are transferred, yet fully functional with complete metadata and incremental retrieval (`git clone --depth` has limited granularity and couples metadata to content)
-* `git-fat` supports the same workflow for large binaries and traditionally versioned files, but internally manages the "fat" files separately
-* `git-bisect` works properly even when versions of the binary files change over time
-* selective control of which large files to pull into the local store
-* local fat object stores can be shared between multiple clones, even by different users
-* can easily support fat object stores distributed across multiple hosts
-* depends only on stock Python and rsync
+
+- clones of the source repository are small and fast because no binaries are transferred, yet fully functional with complete metadata and incremental retrieval (`git clone --depth` has limited granularity and couples metadata to content)
+- `git-fat` supports the same workflow for large binaries and traditionally versioned files, but internally manages the "fat" files separately
+- `git-bisect` works properly even when versions of the binary files change over time
+- selective control of which large files to pull into the local store
+- local fat object stores can be shared between multiple clones, even by different users
+- can easily support fat object stores distributed across multiple hosts
+- depends only on stock Python and rsync
 
 ## Related projects
-* [git-annex](http://git-annex.branchable.com) is a far more comprehensive solution, but with less transparent workflow and with more dependencies.
-* [git-media](https://github.com/schacon/git-media) adopts a similar approach to `git-fat`, but with a different synchronization philosophy and with many Ruby dependencies.
+
+- [git-annex](http://git-annex.branchable.com) is a far more comprehensive solution, but with less transparent workflow and with more dependencies.
+- [git-media](https://github.com/schacon/git-media) adopts a similar approach to `git-fat`, but with a different synchronization philosophy and with many Ruby dependencies.
 
 # Installation and configuration
+
 Place `git-fat` in your `PATH`.
 
 Edit (or create) `.gitattributes` to regard any desired extensions as fat files.
@@ -37,6 +50,13 @@ Set a remote store for the fat objects by editing `.gitfat`.
     [rsync]
     remote = your.remote-host.org:/share/fat-store
 
+To use an Amazon S3 bucket as the storage backend, you should first install the
+[AWS CLI](https://aws.amazon.com/cli/) and have it on your PATH. Your `.gitfat`
+configuration would look like this:
+
+    [s3]
+    bucket = s3://your-s3-bucket
+
 This file should typically be committed to the repository so that others
 will automatically have their remote set. This remote address can use
 any protocol supported by rsync.
@@ -50,11 +70,6 @@ look like this:
     [rsync]
     remote = your.remote-host.org:/share/fat-store
     sshuser = fat
-
-To use an Amazon S3 bucket as the backend, you should first install the AWS CLI and configure it with a user that has access to the bucket. Your configuration would then look like:
-
-    [s3]
-    bucket = s3://your-s3-bucket
 
 # A worked example
 
@@ -109,6 +124,7 @@ The patch itself is very simple and does not include the binary.
     +#$# git-fat 1f218834a137f7b185b498924e7a030008aee2ae
 
 ## Pushing fat files
+
 Now let's push our fat files using the rsync configuration that we set up earlier.
 
     $ git fat push
@@ -122,6 +138,7 @@ Now let's push our fat files using the rsync configuration that we set up earlie
 We might normally set a remote now and push the git repository.
 
 ## Cloning and pulling
+
 Now let's look at what happens when we clone.
 
     $ cd ..
@@ -167,11 +184,12 @@ Everything is in place
     -rw-r--r-- 1 jed users 6449 Nov 25 17:10 master.tar.gz
 
 ## Summary
-* Set the "fat" file types in `.gitattributes`.
-* Use normal git commands to interact with the repository without
+
+- Set the "fat" file types in `.gitattributes`.
+- Use normal git commands to interact with the repository without
   thinking about what files are fat and non-fat. The fat files will be
   treated specially.
-* Synchronize fat files with `git fat push` and `git fat pull`.
+- Synchronize fat files with `git fat push` and `git fat pull`.
 
 ## Retroactive import using `git filter-branch` [Experimental]
 
@@ -215,13 +233,13 @@ the `git fat` fileters run.)
 When this finishes, inspect to see if everything is in order and follow
 the
 [Checklist for Shrinking a Repository](http://www.kernel.org/pub/software/scm/git/docs/git-filter-branch.html#_checklist_for_shrinking_a_repository)
-in the `git filter-branch` man page, typically `git clone
-file:///path/to/repo`. Be sure to `git fat push` from the original
+in the `git filter-branch` man page, typically `git clone file:///path/to/repo`. Be sure to `git fat push` from the original
 repository.
 
 See the script `test-retroactive.sh` for an example of cleaning.
 
 ## Implementation notes
+
 The actual binary files are stored in `.git/fat/objects`, leaving `.git/objects` nice and small.
 
     $ du -bs .git/objects
@@ -236,13 +254,14 @@ will be available in all repositories without extra copies. You still need to
 `git fat push` to make it available to others.
 
 # Some refinements
-* Allow pulling and pushing only select files
-* Relate orphan objects to file system
-* Put some more useful message in smudged (working tree) version of missing files.
-* More friendly configuration for multiple fat remotes
-* Make commands safer in presence of a dirty tree.
-* Private setting of a different remote.
-* Gracefully handle unmanaged files when the filter is called (either
+
+- Allow pulling and pushing only select files
+- Relate orphan objects to file system
+- Put some more useful message in smudged (working tree) version of missing files.
+- More friendly configuration for multiple fat remotes
+- Make commands safer in presence of a dirty tree.
+- Private setting of a different remote.
+- Gracefully handle unmanaged files when the filter is called (either
   legacy files or files matching the pattern that should some reason not
   be treated as fat).
 
