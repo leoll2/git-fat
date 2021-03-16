@@ -269,7 +269,7 @@ class GitFat(object):
                 ]
 
                 remote_item = self.get_remote_item(file, remote_files)
-                if remote_item == {}:
+                if not remote_item:
                     # File is not on remote
                     cmds.append(cmd)
                     continue
