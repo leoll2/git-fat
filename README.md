@@ -280,3 +280,4 @@ will be available in all repositories without extra copies. You still need to
 The original git-fat is developed and maintained by @jedbrown.  
 User @Jwink3101 extended it to support Python 3.  
 User @grahamgilbert provided support to AWS S3 as backend.
+User @reedus-io contributed adding tests for S3 backend, refactoring the test scripts and dockerizing them.
