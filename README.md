@@ -1,12 +1,10 @@
 # git-fat
 
-## Introduction
-
 Checking large binary files into a source repository (Git or otherwise) is a bad idea because repository size quickly becomes unreasonable.
 Even if the instantaneous working tree stays manageable, preserving repository integrity requires all binary files in the entire project history, which given the typically poor compression of binary diffs, implies that the repository size will become impractically large.
 Some people recommend checking binaries into different repositories or even not versioning them at all, but these are not satisfying solutions for most workflows.
 
-## Features of `git-fat`
+## Features
 
 - clones of the source repository are small and fast because no binaries are transferred, yet fully functional with complete metadata and incremental retrieval (`git clone --depth` has limited granularity and couples metadata to content)
 - `git-fat` supports the same workflow for large binaries and traditionally versioned files, but internally manages the "fat" files separately
@@ -279,7 +277,7 @@ will be available in all repositories without extra copies. You still need to
 
 This project is forked from the original ***git-fat*** implementation by Jed Brown [@jedbrown](https://github.com/jedbrown).  
 It includes commit from other user, specifically:
-- Justin Winokur [@Jwink3101](https://github.com/Jwink3101), who forked and ported the code to Python 3, while maintaining compatibility with older Python 2 versions.  
+- Justin Winokur [@Jwink3101](https://github.com/Jwink3101), who forked and ported the code to Python 3, while maintaining compatibility with Python 2.  
 - Graham Gilbert [@grahamgilbert](https://github.com/grahamgilbert), who forked and extended the projec to support Amazon S3 as backend.
 - Organization [@reedus-io](https://github.com/reedus-io), which contributed adding tests for S3, refactoring the test scripts and dockerizing them.  
 
