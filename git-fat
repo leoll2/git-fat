@@ -363,7 +363,10 @@ class GitFat(object):
         return touni(subprocess.check_output(["git", "rev-parse", revname]).strip())
 
     def encode_v2(self, digest, bytes):
-        "Produce representation of file to be stored in repository. 20 characters can hold 64-bit integers."
+        """
+        Produce representation of file to be stored in repository. 20 characters can
+        hold 64-bit integers.
+        """
         return "#$# git-fat %s %20d\n" % (digest, bytes)
 
     def decode(self, string, noraise=False):
@@ -380,7 +383,9 @@ class GitFat(object):
             raise GitFat.DecodeError("Could not decode %s" % (string))
 
     def decode_stream(self, stream):
-        "Return digest if git-fat cache, otherwise return iterator over entire file contents"
+        """
+        Return digest if git-fat cache, otherwise iterator over the entire file contents
+        """
         preamble = stream.read(self.magiclen)
         try:
             return self.decode(preamble)
@@ -408,10 +413,10 @@ class GitFat(object):
 
     def decode_clean(self, body):
         """
-        Attempt to decode version in working tree. The tree version could be changed to have a more
-        useful message than the machine-readable copy that goes into the repository. If the tree
-        version decodes successfully, it indicates that the fat data is not currently available in
-        this repository.
+        Attempt to decode version in working tree. The tree version could be changed to
+        have a more useful message than the machine-readable copy that goes into
+        the repository. If the tree version decodes successfully, it indicates that
+        the fat data is not currently available in this repository.
         """
         digest, bytes = self.decode(body, noraise=True)
         return digest
@@ -420,18 +425,19 @@ class GitFat(object):
         h = hashlib.new("sha1")
         bytes = 0
         fd, tmpname = tempfile.mkstemp(dir=self.objdir)
+        ishanging = False
+        cached = False  # changes to True when file is cached
         try:
-            ishanging = False
-            cached = False  # changes to True when file is cached
             with os.fdopen(fd, "wb") as cache:
                 outstream = cache
                 firstblock = True
                 for block in readblocks(instream):
                     if firstblock:
                         if len(block) == self.magiclen and self.decode_clean(
-                            block[0 : self.magiclen]
+                                block[0 : self.magiclen]
                         ):
-                            ishanging = True  # Working tree version is verbatim from repository (not smudged)
+                            # Working tree version is verbatim from repo (not smudged)
+                            ishanging = True
                             outstream = outstreamclean
                         firstblock = False
                     h.update(block)
@@ -460,8 +466,9 @@ class GitFat(object):
 
     def cmd_filter_clean(self):
         """
-        The clean filter runs when a file is added to the index. It gets the "smudged" (tree)
-        version of the file on stdin and produces the "clean" (repository) version on stdout.
+        The clean filter runs when a file is added to the index.
+        It gets the "smudged" (tree) version of the file on stdin and produces the
+        "clean" (repository) version on stdout.
         """
         self.setup()
         if hasattr(sys.stdin, "buffer"):
@@ -774,8 +781,9 @@ class GitFat(object):
         time0 = time.time()
 
         def hash_only(input, output):
-            """The output of git rev-list --objects shows extra info for blobs, subdirectory trees, and tags.
-            This truncates to one hash per line.
+            """
+            The output of git rev-list --objects shows extra info for blobs,
+            subdirectory trees, and tags. This truncates to one hash per line.
             """
             for line in input:
                 output.write(line[:40] + b"\n")
@@ -968,6 +976,7 @@ if __name__ == "__main__":
         fat.cmd_index_filter(sys.argv[2:])
     else:
         print(
-            "Usage: git fat [init|status|push|pull|gc|verify|checkout|find|index-filter]",
+            "Usage: git fat "
+            "[init|status|push|pull|gc|verify|checkout|find|index-filter]",
             file=sys.stderr,
         )
