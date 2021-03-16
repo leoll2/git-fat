@@ -1,22 +1,5 @@
 # git-fat
 
-## Quick Start
-
-```bash
-sudo curl -L https://raw.githubusercontent.com/leoll2/git-fat/master/git-fat -o /usr/local/bin/git-fat
-sudo chmod +x /usr/local/bin/git-fat
-```
-
-## Integration Tests
-
-All test dependencies are packaged inside the supplied Dockerfile. To run the integration tests:
-
-```bash
-docker run --rm -it $(docker build -q .) bash test.sh
-```
-
-This executes git-fat against Minio (Mock S3) and a local RSYNC directory destination.
-
 ## Introduction
 
 Checking large binary files into a source repository (Git or otherwise) is a bad idea because repository size quickly becomes unreasonable.
@@ -38,9 +21,16 @@ Some people recommend checking binaries into different repositories or even not 
 - [git-annex](http://git-annex.branchable.com) is a far more comprehensive solution, but with less transparent workflow and with more dependencies.
 - [git-media](https://github.com/schacon/git-media) adopts a similar approach to `git-fat`, but with a different synchronization philosophy and with many Ruby dependencies.
 
-# Installation and configuration
+# Installation
 
-Place `git-fat` in your `PATH`.
+All you need is to make `git-fat` (i.e., the executable file in root of this repository) reachable through your `PATH` environmental variable.  
+You can either do this manually (clone the repo, then edit `PATH`), or you can use the following command:
+
+```bash
+sudo curl -L https://raw.githubusercontent.com/leoll2/git-fat/master/git-fat -o /usr/local/bin/git-fat
+sudo chmod +x /usr/local/bin/git-fat
+```
+# Usage
 
 Edit (or create) `.gitattributes` to regard any desired extensions as fat files.
 
@@ -81,7 +71,7 @@ look like this:
     remote = your.remote-host.org:/share/fat-store
     sshuser = fat
 
-# A worked example
+# Workflow example
 
 Before we start, let's turn on verbose reporting so we can see what's
 happening. Without this environment variable, all the output lines
@@ -248,6 +238,16 @@ repository.
 
 See the script `test-retroactive.sh` for an example of cleaning.
 
+## Integration Tests
+
+All test dependencies are packaged inside the supplied Dockerfile. To run the integration tests:
+
+```bash
+docker run --rm -it $(docker build -q .) bash test.sh
+```
+
+This executes git-fat against Minio (Mock S3) and a local RSYNC directory destination.
+
 ## Implementation notes
 
 The actual binary files are stored in `.git/fat/objects`, leaving `.git/objects` nice and small.
@@ -277,7 +277,10 @@ will be available in all repositories without extra copies. You still need to
 
 # Acknowledgements
 
-The original git-fat is developed and maintained by @jedbrown.  
-User @Jwink3101 extended it to support Python 3.  
-User @grahamgilbert provided support to AWS S3 as backend.
-User @reedus-io contributed adding tests for S3 backend, refactoring the test scripts and dockerizing them.
+This project is forked from the original ***git-fat*** implementation by Jed Brown [@jedbrown](https://github.com/jedbrown).  
+It includes commit from other user, specifically:
+- Justin Winokur [@Jwink3101](https://github.com/Jwink3101), who forked and ported the code to Python 3, while maintaining compatibility with older Python 2 versions.  
+- Graham Gilbert [@grahamgilbert](https://github.com/grahamgilbert), who forked and extended the projec to support Amazon S3 as backend.
+- Organization [@reedus-io](https://github.com/reedus-io), which contributed adding tests for S3, refactoring the test scripts and dockerizing them.  
+
+I want to personally thank all them for their valuable contributions.
