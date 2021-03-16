@@ -13,6 +13,7 @@ Some people recommend checking binaries into different repositories or even not 
 - local fat object stores can be shared between multiple clones, even by different users
 - can easily support fat object stores distributed across multiple hosts
 - depends only on stock Python and rsync
+- supports rsync, rclone and Amazon S3 as backends
 
 ## Related projects
 
@@ -41,23 +42,19 @@ Edit (or create) `.gitattributes` to regard any desired extensions as fat files.
 
 Run `git fat init` to activate the extension. Now add and commit as usual.
 Matched files will be transparently stored externally, but will appear
-complete in the working tree.
+complete in the working tree.  
 
-Set a remote store for the fat objects by editing `.gitfat`.
+The following step depends on the storage backend that you want to use.
+In practice, it's a matter of editing the `.gitfat` configuration file.  
+The latter should typically be committed to the repository so, that others
+will automatically have their remote set.
+
+###rsync
+
+To use rsync as backend storage, edit `.gitfat` like this: 
 
     [rsync]
     remote = your.remote-host.org:/share/fat-store
-
-To use an Amazon S3 bucket as the storage backend, you should first install the
-[AWS CLI](https://aws.amazon.com/cli/) and have it on your PATH. Your `.gitfat`
-configuration would look like this:
-
-    [s3]
-    bucket = s3://your-s3-bucket
-
-This file should typically be committed to the repository so that others
-will automatically have their remote set. This remote address can use
-any protocol supported by rsync.
 
 Most users will configure it to use remote ssh in a directory with shared
 access. To do this, set the `sshuser` and `sshport` variables in `.gitfat`
@@ -68,6 +65,21 @@ look like this:
     [rsync]
     remote = your.remote-host.org:/share/fat-store
     sshuser = fat
+
+### AWS S3
+
+To use an Amazon S3 bucket as the storage backend, you should first install the
+[AWS CLI](https://aws.amazon.com/cli/) and have it on your PATH. Your `.gitfat`
+configuration would look like this:
+
+    [s3]
+    bucket = s3://your-s3-bucket
+
+### rclone
+
+To use rclone as backend, first install and configure 
+[rclone](https://rclone.org/install/) and make it accessible through PATH.
+Edit the `.gitfat` as follows
 
 # Workflow example
 
