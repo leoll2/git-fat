@@ -83,7 +83,7 @@ export AWS_DEFAULT_REGION=us-east-1
 export MINIO_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
 export MINIO_SECRET_KEY=${AWS_SECRET_ACCESS_KEY}
 
-pidof minio || nohup minio server /data &
+pidof minio || nohup minio server /tmp/miniodata &
 sleep 1
 
 mkdir -p ~/.aws
