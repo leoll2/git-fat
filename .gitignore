@@ -50,6 +50,10 @@ coverage.xml
 *.cover
 .hypothesis/
 .pytest_cache/
+fat-test
+fat-test2
+.out
+.err
 
 # Translations
 *.mo
