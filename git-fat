@@ -22,6 +22,10 @@ else:  # Python 2
     json.decoder.JSONDecodeError = ValueError
 
 
+class DataTransferDirection:
+    PULL = 1
+    PUSH = 2
+
 def touni(s, encoding="utf8"):
     """Automate unicode conversion"""
     if isinstance(s, (str, unicode)):
@@ -278,16 +282,12 @@ class GitFat(object):
         return output
 
     def get_remote_item(self, file, remote_files):
-        output = {}
-        # self.verbose(remote_files)
         for remote_file in remote_files:
-            # self.verbose(remote_file)
             if remote_file.get("Key", "") == file:
                 return remote_file
+        return {}
 
-        return output
-
-    def get_aws_cmd(self, push, s3_bucket, files):
+    def get_aws_cmd(self, direction, s3_bucket, files):
         if not which("aws"):
             sys.stderr.write("Could not find aws cli install.\n")
             sys.exit(1)
@@ -296,9 +296,9 @@ class GitFat(object):
             s3_bucket = "s3://{}".format(s3_bucket)
         cmds = []
         remote_files = self.get_all_remote_files(s3_bucket)
-        # self.verbose(remote_files)
-        if push:
-            self.verbose("Pushing to %s" % (s3_bucket))
+
+        if direction == DataTransferDirection.PUSH:
+            self.verbose("Pushing to %s" % s3_bucket)
             for file in files:
                 self.verbose("Processing {}".format(file))
                 local_path = os.path.join(self.objdir, file)
@@ -314,7 +314,7 @@ class GitFat(object):
                 if int(remote_item.get("Size")) != os.path.getsize(local_path):
                     cmds.append(cmd)
         else:
-            self.verbose("Pulling from %s" % (s3_bucket))
+            self.verbose("Pulling from %s" % s3_bucket)
             for file in files:
                 self.verbose("Processing {}".format(file))
                 local_path = os.path.join(self.objdir, file)
@@ -332,16 +332,13 @@ class GitFat(object):
                     cmds.append(cmd)
         return cmds
 
-    def get_rsync_command(self, push, files):
-        cfgpath = os.path.join(self.gitroot, ".gitfat")
-        s3_bucket = gitconfig_get("s3.bucket", file=cfgpath)
-        if s3_bucket:
-            return self.get_aws_cmd(push, s3_bucket, files)
+    def get_rsync_command(self, direction):
+
         (remote, ssh_port, ssh_user, options) = self.get_rsync()
-        if push:
-            self.verbose("Pushing to %s" % (remote))
+        if direction == DataTransferDirection.PUSH:
+            self.verbose("Pushing to %s" % remote)
         else:
-            self.verbose("Pulling from %s" % (remote))
+            self.verbose("Pulling from %s" % remote)
 
         cmd = ["rsync", "--progress", "--ignore-existing", "--from0", "--files-from=-"]
         rshopts = ""
@@ -353,11 +350,66 @@ class GitFat(object):
             cmd.append("--rsh=ssh" + rshopts)
         if options:
             cmd += options.split(" ")
-        if push:
+        if direction == DataTransferDirection.PUSH:
             cmd += [self.objdir + "/", remote + "/"]
         else:
             cmd += [remote + "/", self.objdir + "/"]
         return [cmd]
+
+    def get_rclone_cmd(self, direction, files):
+
+        if not which("rclone"):
+            sys.stderr.write("Could not find rclone install.\n")
+            sys.exit(1)
+
+        cfgpath = os.path.join(self.gitroot, ".gitfat")
+        remote = gitconfig_get("rclone.remote", file=cfgpath)
+        rclone_config = gitconfig_get("rclone.config", file=cfgpath)
+
+        if direction == DataTransferDirection.PUSH:
+            self.verbose("Pushing to %s" % remote)
+        else:
+            self.verbose("Pulling from %s" % remote)
+
+        cmds = []
+        for file in files:
+            self.verbose("Processing {}".format(file))
+            cmd = ["rclone", "copy"]
+            if rclone_config:
+                cmd.extend(["--config", rclone_config])
+            if direction == DataTransferDirection.PUSH:
+                local_path = os.path.join(self.objdir, file)
+                remote_path = "{}:{}".format(remote, os.path.dirname(file))
+                cmd.extend([local_path, remote_path])
+            else:
+                local_path = os.path.join(self.objdir, os.path.dirname(file))
+                remote_path = "{}:{}".format(remote, file)
+                cmd.extend([remote_path, local_path])
+            cmds.append(cmd)
+            # TODO skip files that are already in the destination
+
+        return cmds
+
+    def get_data_transfer_command(self, direction, files):
+
+        cfgpath = os.path.join(self.gitroot, ".gitfat")
+
+        # Check if the backend is rsync
+        rsync_remote = gitconfig_get("rsync.remote", file=cfgpath)
+        if rsync_remote:
+            return self.get_rsync_command(direction)
+
+        # Check if the backend is S3
+        s3_bucket = gitconfig_get("s3.bucket", file=cfgpath)
+        if s3_bucket:
+            return self.get_aws_cmd(direction, s3_bucket, files)
+
+        # Check if the backend is rclone
+        rclone_remote = gitconfig_get("rclone.remote", file=cfgpath)
+        if rclone_remote:
+            return self.get_rclone_cmd(direction, files)
+
+        raise ValueError("Couldn't figure out the backend. Please check .gitfat")
 
     def revparse(self, revname):
         return touni(subprocess.check_output(["git", "rev-parse", revname]).strip())
@@ -632,7 +684,10 @@ class GitFat(object):
         # (includes history). Finer-grained pushing would be useful.
         pushall = "--all" in args
         files = self.referenced_objects(all=pushall) & self.catalog_objects()
-        cmds = self.get_rsync_command(push=True, files=files)
+        cmds = self.get_data_transfer_command(
+            direction=DataTransferDirection.PUSH,
+            files=files
+        )
         total = len(cmds)
         counter = 0
         for cmd in cmds:
@@ -712,7 +767,10 @@ class GitFat(object):
             if rev:
                 refargs["rev"] = rev
         files = self.filter_objects(refargs, self.parse_pull_patterns(args))
-        cmds = self.get_rsync_command(push=False, files=files)
+        cmds = self.get_data_transfer_command(
+            direction=DataTransferDirection.PULL,
+            files=files
+        )
         for cmd in cmds:
             self.verbose("Executing: %s" % " ".join(cmd))
             p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
