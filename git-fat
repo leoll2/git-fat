@@ -208,12 +208,15 @@ class GitFat(object):
 
         cmd = ["aws", "s3api", "list-objects-v2", "--bucket", bucket]
         output = []
-        try:
-            initial_output = subprocess.check_output(cmd)
-        except json.decoder.JSONDecodeError:
-            initial_output = {}
 
-        processed = json.loads(initial_output)
+        initial_output = subprocess.check_output(cmd)
+        initial_output = touni(initial_output)
+
+        try:
+            processed = json.loads(initial_output)
+        except json.decoder.JSONDecodeError:
+            processed = {}
+
         for item in processed.get("Contents", []):
             output.append(item)
 
