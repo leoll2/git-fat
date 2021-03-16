@@ -102,10 +102,10 @@ Now we add a binary file whose name matches the pattern we set in `.gitattribute
                                      Dload  Upload   Total   Spent    Left  Speed
     100  6449  100  6449    0     0   7741      0 --:--:-- --:--:-- --:--:--  9786
     $ git add master.tar.gz
-    git-fat filter-clean: caching to /tmp/repo/.git/fat/objects/b3489819f81603b4c04e8ed134b80bace0810324
+    git-fat filter-clean: caching to /tmp/repo/.git/fat/objects/b3/489819f81603b4c04e8ed134b80bace0810324
     $ git commit -m'Added master.tar.gz'
     [master b85a96f] Added master.tar.gz
-    git-fat filter-clean: caching to /tmp/repo/.git/fat/objects/b3489819f81603b4c04e8ed134b80bace0810324
+    git-fat filter-clean: caching to /tmp/repo/.git/fat/objects/b3/489819f81603b4c04e8ed134b80bace0810324
      1 file changed, 1 insertion(+)
      create mode 100644 master.tar.gz
 
@@ -159,7 +159,7 @@ We can always get a summary of what fat objects are missing in our local cache.
 
 Now get any objects referenced by our current `HEAD`. This command also
 accepts the `--all` option to pull full history, or a revision to pull
-selected history.
+selected history. To pull only a specific file, use `-- <filepath>`.
 
     $ git fat pull
     receiving file list ...
@@ -170,12 +170,12 @@ selected history.
     sent 30 bytes  received 6558 bytes  4392.00 bytes/sec
     total size is 6449  speedup is 0.98
     Restoring 1f218834a137f7b185b498924e7a030008aee2ae -> master.tar.gz
-    git-fat filter-smudge: restoring from /tmp/repo2/.git/fat/objects/1f218834a137f7b185b498924e7a030008aee2ae
+    git-fat filter-smudge: restoring from /tmp/repo2/.git/fat/objects/1f/218834a137f7b185b498924e7a030008aee2ae
 
 Everything is in place
 
     $ git status
-    git-fat filter-clean: caching to /tmp/repo2/.git/fat/objects/1f218834a137f7b185b498924e7a030008aee2ae
+    git-fat filter-clean: caching to /tmp/repo2/.git/fat/objects/1f/218834a137f7b185b498924e7a030008aee2ae
     # On branch master
     nothing to commit, working directory clean
     $ ls -l                                 # recovered the full file
@@ -253,9 +253,9 @@ The actual binary files are stored in `.git/fat/objects`, leaving `.git/objects`
 
     $ du -bs .git/objects
     2212    .git/objects/
-    $ ls -l .git/fat/objects                # This is where the file actually goes, but that's not important
+    $ ls -l .git/fat/objects/1f              # This is where the file actually goes, but that's not important
     total 8
-    -rw------- 1 jed users 6449 Nov 25 17:01 1f218834a137f7b185b498924e7a030008aee2ae
+    -rw------- 1 jed users 6449 Nov 25 17:01 218834a137f7b185b498924e7a030008aee2ae
 
 If you have multiple clones that access the same filesystem, you can make
 `.git/fat/objects` a symlink to a common location, in which case all content
