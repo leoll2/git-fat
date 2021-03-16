@@ -20,6 +20,7 @@ if sys.version_info[0] > 2:
     unicode = str
 else:
     from io import open
+    json.decoder.JSONDecodeError = ValueError
 
 def touni(s,encoding='utf8'):
     """Automate unicode conversion"""
