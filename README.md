@@ -281,5 +281,6 @@ It includes commit from other user, specifically:
 - Graham Gilbert [@grahamgilbert](https://github.com/grahamgilbert), who forked and extended the projec to support Amazon S3 as backend.
 - Organization [@reedus-io](https://github.com/reedus-io), which contributed adding tests for S3, refactoring the test scripts and dockerizing them.  
 - Purdea Andrei [@purdeaandrei](https://github.com/purdeaandrei) improved the speed of the `git fat checkout` operation.
+- Guo Tang [@qigtang](https://github.com/qigtang) improved the scalability by storing the objects in sha1-prefixed directories, like Git does.
 
 I want to personally thank all them for their valuable contributions.
