@@ -590,7 +590,7 @@ class GitFat(object):
                 if not accessible:
                     print('Data unavailable: %s %s' % (digest,fname))
 
-        filenames_nullterm = "\x00".join(filenames_to_restore)
+        filenames_nullterm = b'\x00'.join(tobytes(f) for f in filenames_to_restore)
 
         if not self.is_verbose:
             print('Restoring %d Files' % (len(filenames_to_restore),))
