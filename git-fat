@@ -197,12 +197,12 @@ class GitFat(object):
             raise RuntimeError('No rsync.remote in %s' % cfgpath)
         return remote, ssh_port, ssh_user, options
 
-    def local_sha1_checksum(self, path: str):
+    def local_sha1_checksum(self, path):
         # return hashlib.md5(open(path, "rb").read()).hexdigest()
         # Cheat here
         return path
 
-    def get_all_remote_files(self, bucket: str):
+    def get_all_remote_files(self, bucket):
         if bucket.startswith("s3://"):
             bucket = bucket.replace("s3://", "")
 
@@ -555,7 +555,7 @@ class GitFat(object):
         counter = 0
         for cmd in cmds:
             counter = counter + 1
-            print(f'Executing file {counter} of {total}')
+            self.verbose('Executing file {} of {}'.format(counter, total))
             self.verbose('Executing: %s' % ' '.join(cmd))
             p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
             p.communicate(input=b'\x00'.join(tobytes(f) for f in files))
