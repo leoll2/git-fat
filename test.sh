@@ -74,6 +74,16 @@ echo "
 remote = /tmp/fat-store
 " | tee .gitfat
 run_integration_test
+rm -rf /tmp/fat-store
+
+## ________________________________________
+## RCLONE integration tests
+echo "
+[rclone]
+remote = /tmp/fat-store
+" | tee .gitfat
+run_integration_test
+rm -rf /tmp/fat-store
 
 ## ________________________________________
 ## AWS S3 integration tests
