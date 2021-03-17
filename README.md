@@ -82,7 +82,7 @@ To use rclone as backend, first install and configure
 Edit the `.gitfat` as follows:
 
     [rclone]
-    remote = your.remote-host.org:/share/fat-store
+    remote = yourremote:/share/fat-store
     config = /home/fatman/.config/rclone/rclone.config
 
 Specifying the rclone configuration file path is optional; if missing, rclone will use the default one.
