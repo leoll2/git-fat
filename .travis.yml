@@ -1,0 +1,6 @@
+sudo: required
+services:
+  - docker
+script:
+  - docker build --tag gitfat .
+  - docker run gitfat ./run_test.py
