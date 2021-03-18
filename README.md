@@ -79,7 +79,13 @@ configuration would look like this:
 
 To use rclone as backend, first install and configure 
 [rclone](https://rclone.org/install/) and make it accessible through PATH.
-Edit the `.gitfat` as follows
+Edit the `.gitfat` as follows:
+
+    [rclone]
+    remote = yourremote:/share/fat-store
+    config = /home/fatman/.config/rclone/rclone.config
+
+Specifying the rclone configuration file path is optional; if missing, rclone will use the default one.
 
 # Workflow example
 
