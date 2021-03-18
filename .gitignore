@@ -52,6 +52,8 @@ coverage.xml
 .pytest_cache/
 fat-test
 fat-test2
+retro*
+TEST*
 .out
 .err
 
@@ -90,6 +92,9 @@ celerybeat-schedule
 
 # Rope project settings
 .ropeproject
+
+# IntelliJ
+.idea
 
 # Mr Developer
 .mr.developer.cfg
