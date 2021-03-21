@@ -83,14 +83,35 @@ configuration would look like this:
 ### rclone
 
 To use rclone as backend, first install and configure 
-[rclone](https://rclone.org/install/) and make it accessible through PATH.
-Edit the `.gitfat` as follows:
+[rclone](https://rclone.org/install/) and make it accessible through PATH.  
+Then, you have various options to configure `.gitfat` to use rclone.
+
+#### (Option 1) Use an existing remote
 
     [rclone]
-    remote = yourremote:/share/fat-store
+    remote = yourremote
+    remotedir = /share/fat-store
     config = /home/fatman/.config/rclone/rclone.config
 
-Specifying the rclone configuration file path is optional; if missing, rclone will use the default one.
+Here `remote` is the name of your existing rclone remote. git-fat will store the data in `<remote>:<remotedir>`; if unspecified, `remotedir` defaults to an empty string. `config` is the path to the local rclone configuration file, where the remote is defined; typically its stored in `~/.config/rclone/rclone.conf`, but you can use a different path if you want.
+
+#### (Option 2) Setup a remote locally on the fly
+
+    [rclone]
+    remote = yourremote
+    remotedir = /share/fat-store
+    < any other field you would have in rclone.conf >
+
+git-fat will store the data in `<remote>:<remotedir>`, where remotedir defaults to an empty string if missing. You can then add any other field supported by rclone using the very same key-value syntax (refer to [rclone docs](https://rclone.org/docs/)). In particular, you will always specify the `type`, and possibly other field like `root_folder_id`, `scope`, `token`, `service_account_file`, ...  
+
+For example:
+    [rclone]
+    remote = myremote
+    remotedir = myfatvault
+    type = drive
+    scope = drive
+    service_account_file = /my/local/path/mycredentials.json
+    root_folder_id = A83ab3kl-GH2104a3
 
 # Workflow example
 

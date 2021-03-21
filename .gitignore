@@ -122,3 +122,7 @@ dmypy.json
 ### VisualStudioCode Patch ###
 # Ignore all local history of files
 .history
+
+### git-fat ###
+# Ignore local cache files
+.rclone.conf

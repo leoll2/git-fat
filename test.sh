@@ -78,9 +78,13 @@ rm -rf /tmp/fat-store
 
 ## ________________________________________
 ## RCLONE integration tests
+mkdir -p /tmp/fat-store
 echo "
 [rclone]
-remote = /tmp/fat-store
+remote = fat-store
+remotedir = /tmp/fat-store
+type = local
+nounc = true
 " | tee .gitfat
 run_integration_test
 rm -rf /tmp/fat-store
@@ -121,3 +125,5 @@ echo "
 bucket = test-bucket
 " | tee .gitfat
 run_integration_test
+
+pkill minio
