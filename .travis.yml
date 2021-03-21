@@ -3,4 +3,4 @@ services:
   - docker
 script:
   - docker build --tag gitfat .
-  - docker run gitfat ./run_test.py
+  - docker run gitfat bash -c "git clone --depth 1 -b $TRAVIS_BRANCH https://github.com/leoll2/git-fat && cd git-fat && cp git-fat /usr/local/bin/git-fat && ./run_test.py"
