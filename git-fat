@@ -15,10 +15,10 @@ import json
 import collections
 
 if sys.version_info[0] == 3:  # Python 3
-    from configparser import ConfigParser
+    from configparser import ConfigParser, NoSectionError, NoOptionError
     unicode = str
 else:  # Python 2
-    from ConfigParser import ConfigParser
+    from ConfigParser import ConfigParser, NoSectionError, NoOptionError
     from io import open
 
     json.decoder.JSONDecodeError = ValueError
@@ -223,7 +223,10 @@ def config_get(file, sect, key):
         sys.exit(1)
     config = ConfigParser()
     config.read(file)
-    return config.get(sect, key, fallback=None)
+    try:
+        return config.get(sect, key)
+    except (NoSectionError, NoOptionError):
+        return None
 
 
 def config_get_options_from_section(file, sect):
@@ -437,7 +440,8 @@ class GitFat(object):
                     if k in ("remote", "remotedir", "config"):
                         continue
                     local_rclone_cfg.set(remote_name, k, v)
-                with open(local_rclone_cfgpath, 'w') as outf:
+                openmode = "w" if sys.version_info[0] == 3 else "wb"
+                with open(local_rclone_cfgpath, openmode) as outf:
                     local_rclone_cfg.write(outf)
 
         if direction == DataTransferDirection.PUSH:
