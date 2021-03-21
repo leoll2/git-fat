@@ -1,11 +1,5 @@
 FROM ubuntu
 
-ADD git-fat /usr/local/bin/git-fat
-ADD git-fat .
-ADD test.sh .
-ADD test-retroactive.sh .
-ADD run_test.py .
-
 RUN apt-get update -qq && apt-get upgrade -y && apt-get install -y software-properties-common && add-apt-repository universe
 
 RUN apt-get install -y --no-install-recommends \
