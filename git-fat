@@ -15,8 +15,10 @@ import json
 import collections
 
 if sys.version_info[0] == 3:  # Python 3
+    from configparser import ConfigParser, NoSectionError, NoOptionError
     unicode = str
 else:  # Python 2
+    from ConfigParser import ConfigParser, NoSectionError, NoOptionError
     from io import open
 
     json.decoder.JSONDecodeError = ValueError
@@ -196,6 +198,57 @@ def gitconfig_set(name, value, file=None):
     subprocess.check_call(args)
 
 
+# TODO refactor these functions as class members to avoid parsing the config everytime
+def config_has_section(file, sect):
+    if not os.path.isfile(file):
+        sys.stderr.write("Could not find configuration at: %s\n" % file)
+        sys.exit(1)
+    config = ConfigParser()
+    config.read(file)
+    return config.has_section(sect)
+
+
+def config_has_option(file, sect, opt):
+    if not os.path.isfile(file):
+        sys.stderr.write("Could not find configuration at: %s\n" % file)
+        sys.exit(1)
+    config = ConfigParser()
+    config.read(file)
+    return config.has_option(sect, opt)
+
+
+def config_get(file, sect, key):
+    if not os.path.isfile(file):
+        sys.stderr.write("Could not find configuration at: %s\n" % file)
+        sys.exit(1)
+    config = ConfigParser()
+    config.read(file)
+    try:
+        return config.get(sect, key)
+    except (NoSectionError, NoOptionError):
+        return None
+
+
+def config_get_options_from_section(file, sect):
+    if not os.path.isfile(file):
+        sys.stderr.write("Could not find configuration at: %s\n" % file)
+        sys.exit(1)
+    config = ConfigParser()
+    config.read(file)
+    return config.items(sect)
+
+
+def config_set(file, sect, key, val):
+    if not os.path.isfile(file):
+        sys.stderr.write("Could not find configuration at: %s\n" % file)
+        sys.exit(1)
+    config = ConfigParser()
+    config.read(file)
+    config.set(sect, key, val)
+    with open(file, 'w') as out:
+        config.write(out)
+
+
 class GitFat(object):
     DecodeError = RuntimeError
 
@@ -363,28 +416,55 @@ class GitFat(object):
             sys.exit(1)
 
         cfgpath = os.path.join(self.gitroot, ".gitfat")
-        remote = gitconfig_get("rclone.remote", file=cfgpath)
-        rclone_config = gitconfig_get("rclone.config", file=cfgpath)
+        local_rclone_cfgpath = os.path.join(self.gitroot, ".rclone.conf")
+        remote_name = config_get(cfgpath, "rclone", "remote")
+        remote_dir = config_get(cfgpath, "rclone", "remotedir") or ""
+
+        # If the rclone config is not cached locally, create it
+        if not os.path.isfile(local_rclone_cfgpath):
+            # Use the config file pointed in .gitfat, if specified
+            rclone_config = config_get(cfgpath, "rclone", "config")
+            if rclone_config:
+                # Cache it locally
+                with open(local_rclone_cfgpath, 'w') as outf:
+                    subprocess.call(
+                        ["rclone", "config", "show", remote_name], stdout=outf
+                    )
+            else:
+                # If 'config' field absent under [rclone], parse the other fields
+                # to setup rclone locally
+                opts = config_get_options_from_section(cfgpath, "rclone")
+                local_rclone_cfg = ConfigParser()
+                local_rclone_cfg.add_section(remote_name)
+                for k, v in opts:
+                    if k in ("remote", "remotedir", "config"):
+                        continue
+                    local_rclone_cfg.set(remote_name, k, v)
+                openmode = "w" if sys.version_info[0] == 3 else "wb"
+                with open(local_rclone_cfgpath, openmode) as outf:
+                    local_rclone_cfg.write(outf)
 
         if direction == DataTransferDirection.PUSH:
-            self.verbose("Pushing to %s" % remote)
+            self.verbose("Pushing to %s" % remote_name)
         else:
-            self.verbose("Pulling from %s" % remote)
+            self.verbose("Pulling from %s" % remote_name)
 
         cmds = []
         for file in files:
             self.verbose("Processing {}".format(file))
             cmd = ["rclone", "copy"]
-            if rclone_config:
-                cmd.extend(["--config", rclone_config])
+            if local_rclone_cfgpath:
+                cmd.extend(["--config", local_rclone_cfgpath])
             if direction == DataTransferDirection.PUSH:
                 local_path = os.path.join(self.objdir, file)
-                remote_path = "{}:{}".format(remote, os.path.dirname(file))
-                cmd.extend([local_path, remote_path])
+                remote_path = os.path.join(remote_dir, file)
+                remote_fullpath = "{}:{}".format(remote_name, os.path.dirname(remote_path))
+                cmd.extend([local_path, remote_fullpath])
             else:
                 local_path = os.path.join(self.objdir, os.path.dirname(file))
-                remote_path = "{}:{}".format(remote, file)
-                cmd.extend([remote_path, local_path])
+                remote_path = os.path.join(remote_dir, file)
+                remote_fullpath = "{}:{}".format(remote_name, remote_path)
+                cmd.extend([remote_fullpath, local_path])
             cmds.append(cmd)
             # TODO skip files that are already in the destination
 
@@ -395,18 +475,19 @@ class GitFat(object):
         cfgpath = os.path.join(self.gitroot, ".gitfat")
 
         # Check if the backend is rsync
-        rsync_remote = gitconfig_get("rsync.remote", file=cfgpath)
-        if rsync_remote:
+        is_rsync = config_has_section(cfgpath, "rsync")
+        if is_rsync:
             return self.get_rsync_command(direction)
 
         # Check if the backend is S3
-        s3_bucket = gitconfig_get("s3.bucket", file=cfgpath)
-        if s3_bucket:
+        is_s3 = config_has_section(cfgpath, "s3")
+        if is_s3:
+            s3_bucket = config_get(cfgpath, "s3", "bucket")
             return self.get_aws_cmd(direction, s3_bucket, files)
 
         # Check if the backend is rclone
-        rclone_remote = gitconfig_get("rclone.remote", file=cfgpath)
-        if rclone_remote:
+        is_rclone = config_has_section(cfgpath, "rclone")
+        if is_rclone:
             return self.get_rclone_cmd(direction, files)
 
         raise ValueError("Couldn't figure out the backend. Please check .gitfat")
