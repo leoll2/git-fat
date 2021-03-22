@@ -417,7 +417,7 @@ class GitFat(object):
 
         cfgpath = os.path.join(self.gitroot, ".gitfat")
         local_rclone_cfgpath = os.path.join(self.gitroot, ".rclone.conf")
-        remote_name = config_get(cfgpath, "rclone", "remote")
+        remote_name = config_get(cfgpath, "rclone", "remote") or "auto"
         remote_dir = config_get(cfgpath, "rclone", "remotedir") or ""
 
         # If the rclone config is not cached locally, create it

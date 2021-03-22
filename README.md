@@ -102,11 +102,12 @@ Here `remote` is the name of your existing rclone remote. git-fat will store the
     remotedir = /share/fat-store
     < any other field you would have in rclone.conf >
 
-git-fat will store the data in `<remote>:<remotedir>`, where remotedir defaults to an empty string if missing. You can then add any other field supported by rclone using the very same key-value syntax (refer to [rclone docs](https://rclone.org/docs/)). In particular, you will always specify the `type`, and possibly other field like `root_folder_id`, `scope`, `token`, `service_account_file`, ...  
+git-fat will store the data in `<remote>:<remotedir>`.
+`remote` can be omitted and defaults to `auto`, while `remotedir` defaults to an empty string if missing. You can then add any other field supported by rclone using the very same key-value syntax (refer to [rclone docs](https://rclone.org/docs/)). In particular, you will always specify the `type`, and possibly other field like `root_folder_id`, `scope`, `token`, `service_account_file`, ...  
 
 For example:
+
     [rclone]
-    remote = myremote
     remotedir = myfatvault
     type = drive
     scope = drive

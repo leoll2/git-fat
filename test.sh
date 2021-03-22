@@ -81,7 +81,6 @@ rm -rf /tmp/fat-store
 mkdir -p /tmp/fat-store
 echo "
 [rclone]
-remote = fat-store
 remotedir = /tmp/fat-store
 type = local
 nounc = true
