@@ -3,16 +3,17 @@
 
 from __future__ import print_function, with_statement, unicode_literals
 
-import sys
+import argparse
+import collections
 import hashlib
-import tempfile
+import itertools
+import json
 import os
 import subprocess
-import itertools
+import sys
+import tempfile
 import threading
 import time
-import json
-import collections
 
 if sys.version_info[0] == 3:  # Python 3
     from configparser import ConfigParser, NoSectionError, NoOptionError
@@ -27,6 +28,7 @@ else:  # Python 2
 class DataTransferDirection:
     PULL = 1
     PUSH = 2
+
 
 def touni(s, encoding="utf8"):
     """Automate unicode conversion"""
@@ -45,34 +47,6 @@ def tobytes(s, encoding="utf8"):
         return s.encode(encoding)
     raise ValueError("Could not encode")
 
-
-try:
-    from subprocess import check_output
-
-    del check_output
-except ImportError:
-
-    def backport_check_output(*popenargs, **kwargs):
-        r"""Run command with arguments and return its output as a byte string.
-
-        Backported from Python 2.7 as it's implemented as pure python on stdlib.
-
-        >>> check_output(['/usr/bin/python', '--version'])
-        Python 2.6.2
-        """
-        process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
-        output, unused_err = process.communicate()
-        retcode = process.poll()
-        if retcode:
-            cmd = kwargs.get("args")
-            if cmd is None:
-                cmd = popenargs[0]
-            error = subprocess.CalledProcessError(retcode, cmd)
-            error.output = output
-            raise error
-        return output
-
-    subprocess.check_output = backport_check_output
 
 BLOCK_SIZE = 4096
 
@@ -96,7 +70,7 @@ def which(program):
 
 def hash2fname(hvalue):
     """
-    convert SHA-1 has to filename. Follow git convention
+    Convert SHA-1 has to filename. Follow git convention
     of using the first 2 characters as folder name.
     """
     fpath = os.path.join(hvalue[:2], hvalue[2:])
@@ -597,49 +571,6 @@ class GitFat(object):
             if not cached:
                 os.remove(tmpname)
 
-    def cmd_filter_clean(self):
-        """
-        The clean filter runs when a file is added to the index.
-        It gets the "smudged" (tree) version of the file on stdin and produces the
-        "clean" (repository) version on stdout.
-        """
-        self.setup()
-        if hasattr(sys.stdin, "buffer"):
-            stdin, stdout = sys.stdin.buffer, sys.stdout.buffer
-        else:
-            stdin, stdout = sys.stdin, sys.stdout
-        self.filter_clean(stdin, stdout)
-
-    def cmd_filter_smudge(self):
-        self.setup()
-        if hasattr(sys.stdin, "buffer"):
-            stdin, stdout = sys.stdin.buffer, sys.stdout.buffer
-        else:
-            stdin, stdout = sys.stdin, sys.stdout
-        result, bytes = self.decode_stream(stdin)
-        if isinstance(result, str):  # We got a digest
-            objfile = os.path.join(self.objdir, hash2fname(result))
-            try:
-                cat(open(objfile, "rb"), stdout)
-                self.verbose("git-fat filter-smudge: restoring from %s" % objfile)
-            except IOError:  # file not found
-                self.verbose("git-fat filter-smudge: fat object missing %s" % objfile)
-                stdout.write(
-                    tobytes(self.encode(result, bytes))
-                )  # could leave a better notice about how to recover this file
-        else:  # We have an iterable over the original input.
-            self.verbose("git-fat filter-smudge: not a managed file")
-            cat_iter(result, stdout)
-
-    def catalog_objects(self):
-        catalog = set()
-        for x in os.listdir(self.objdir):
-            subdir = os.path.join(self.objdir, x)
-            if len(x) == 2 and os.path.isdir(subdir):
-                for y in os.listdir(subdir):
-                    catalog.add(os.path.join(x, y))
-        return catalog
-
     def referenced_objects(self, rev=None, all=False):
         referenced = set()
         if all:
@@ -734,51 +665,17 @@ class GitFat(object):
             if digest:
                 yield (digest, fname)
 
-    def cmd_status(self, args):
-        self.setup()
-        catalog = self.catalog_objects()
-        refargs = dict()
-        if "--all" in args:
-            refargs["all"] = True
-        referenced = self.referenced_objects(**refargs)
-        garbage = catalog - referenced
-        orphans = referenced - catalog
-        if "--all" in args:
-            for obj in referenced:
-                print(obj)
-        if orphans:
-            print("Orphan objects:")
-            for orph in orphans:
-                print("    " + orph)
-        if garbage:
-            print("Garbage objects:")
-            for g in garbage:
-                print("    " + g)
+    def catalog_objects(self):
+        catalog = set()
+        for x in os.listdir(self.objdir):
+            subdir = os.path.join(self.objdir, x)
+            if len(x) == 2 and os.path.isdir(subdir):
+                for y in os.listdir(subdir):
+                    catalog.add(os.path.join(x, y))
+        return catalog
 
     def is_dirty(self):
         return subprocess.call(["git", "diff-index", "--quiet", "HEAD"]) == 0
-
-    def cmd_push(self, args):
-        "Push anything that I have stored and referenced"
-        self.setup()
-        # Default to push only those objects referenced by current HEAD
-        # (includes history). Finer-grained pushing would be useful.
-        pushall = "--all" in args
-        files = self.referenced_objects(all=pushall) & self.catalog_objects()
-        cmds = self.get_data_transfer_command(
-            direction=DataTransferDirection.PUSH,
-            files=files
-        )
-        total = len(cmds)
-        counter = 0
-        for cmd in cmds:
-            counter = counter + 1
-            self.verbose("Executing file {} of {}".format(counter, total))
-            self.verbose("Executing: %s" % " ".join(cmd))
-            p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-            p.communicate(input=b"\x00".join(tobytes(f) for f in files))
-            if p.returncode:
-                sys.exit(p.returncode)
 
     def checkout(self, show_orphans=False):
         "Update any stale files in the present working tree"
@@ -835,31 +732,6 @@ class GitFat(object):
                 error = subprocess.CalledProcessError(retcode, " ".join(cmd))
                 raise error
 
-    def cmd_pull(self, args):
-        "Pull anything that I have referenced, but not stored"
-        self.setup()
-        refargs = dict()
-        if "--all" in args:
-            refargs["all"] = True
-        for arg in args:
-            if arg.startswith("-") or len(arg) != 40:
-                continue
-            rev = self.revparse(arg)
-            if rev:
-                refargs["rev"] = rev
-        files = self.filter_objects(refargs, self.parse_pull_patterns(args))
-        cmds = self.get_data_transfer_command(
-            direction=DataTransferDirection.PULL,
-            files=files
-        )
-        for cmd in cmds:
-            self.verbose("Executing: %s" % " ".join(cmd))
-            p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-            p.communicate(input=b"\x00".join(tobytes(f) for f in files))
-            if p.returncode:
-                sys.exit(p.returncode)
-        self.checkout()
-
     def parse_pull_patterns(self, args):
         if "--" not in args:
             return [""]
@@ -877,47 +749,6 @@ class GitFat(object):
         orphans_matched = list(self.orphan_files(patterns))
         orphans_objects = set(map(lambda x: hash2fname(x[0]), orphans_matched))
         return files & orphans_objects
-
-    def cmd_checkout(self, args):
-        self.checkout(show_orphans=True)
-
-    def cmd_gc(self):
-        garbage = self.catalog_objects() - self.referenced_objects()
-        print("Unreferenced objects to remove: %d" % len(garbage))
-        for obj in garbage:
-            fname = os.path.join(self.objdir, obj)
-            print("%10d %s" % (os.stat(fname).st_size, obj))
-            os.remove(fname)
-
-    def cmd_verify(self):
-        """Print details of git-fat objects with incorrect data hash"""
-        corrupted_objects = []
-        for obj in self.catalog_objects():
-            fname = os.path.join(self.objdir, obj)
-            h = hashlib.new("sha1")
-            for block in readblocks(open(fname, "rb")):
-                h.update(block)
-            expected_hash = obj.replace("/", "")
-            data_hash = h.hexdigest()
-            if expected_hash != data_hash:
-                corrupted_objects.append((expected_hash, data_hash))
-        if corrupted_objects:
-            print("Corrupted objects: %d" % len(corrupted_objects))
-            for expected_hash, data_hash in corrupted_objects:
-                print(
-                    "Found object stored with hash %s, but the hash of its content "
-                    "is actually %s" % (expected_hash, data_hash)
-                )
-            sys.exit(1)
-
-    def cmd_init(self):
-        self.setup()
-        if self.is_init_done():
-            print("Git fat already configured, check configuration in .git/config")
-        else:
-            gitconfig_set("filter.fat.clean", "git-fat filter-clean")
-            gitconfig_set("filter.fat.smudge", "git-fat filter-smudge")
-            print("Initialized git fat")
 
     def gen_large_blobs(self, revs, threshsize):
         """Build dict of all blobs"""
@@ -969,9 +800,159 @@ class GitFat(object):
             % (numlarge, numblobs, threshsize, time1 - time0)
         )
 
-    def cmd_find(self, args):
-        maxsize = int(args[0])
-        blobsizes = dict(self.gen_large_blobs("--all", maxsize))
+    def cmd_init(self):
+        """
+        Configure git-fat
+        """
+        self.setup()
+        if self.is_init_done():
+            print("Git fat already configured, check configuration in .git/config")
+        else:
+            gitconfig_set("filter.fat.clean", "git-fat filter-clean")
+            gitconfig_set("filter.fat.smudge", "git-fat filter-smudge")
+            print("Initialized git fat")
+
+    def cmd_filter_clean(self):
+        """
+        The clean filter runs when a file is added to the index.
+        It gets the "smudged" (tree) version of the file on stdin and produces the
+        "clean" (repository) version on stdout.
+        """
+        self.setup()
+        if hasattr(sys.stdin, "buffer"):
+            stdin, stdout = sys.stdin.buffer, sys.stdout.buffer
+        else:
+            stdin, stdout = sys.stdin, sys.stdout
+        self.filter_clean(stdin, stdout)
+
+    def cmd_filter_smudge(self):
+        self.setup()
+        if hasattr(sys.stdin, "buffer"):
+            stdin, stdout = sys.stdin.buffer, sys.stdout.buffer
+        else:
+            stdin, stdout = sys.stdin, sys.stdout
+        result, bytes = self.decode_stream(stdin)
+        if isinstance(result, str):  # We got a digest
+            objfile = os.path.join(self.objdir, hash2fname(result))
+            try:
+                cat(open(objfile, "rb"), stdout)
+                self.verbose("git-fat filter-smudge: restoring from %s" % objfile)
+            except IOError:  # file not found
+                self.verbose("git-fat filter-smudge: fat object missing %s" % objfile)
+                stdout.write(
+                    tobytes(self.encode(result, bytes))
+                )  # could leave a better notice about how to recover this file
+        else:  # We have an iterable over the original input.
+            self.verbose("git-fat filter-smudge: not a managed file")
+            cat_iter(result, stdout)
+
+    def cmd_status(self, show_all=False):
+        self.setup()
+        catalog = self.catalog_objects()
+        refargs = dict()
+        if show_all:
+            refargs["all"] = True
+        referenced = self.referenced_objects(**refargs)
+        garbage = catalog - referenced
+        orphans = referenced - catalog
+        if show_all:
+            for obj in referenced:
+                print(obj)
+        if orphans:
+            print("Orphan objects:")
+            for orph in orphans:
+                print("    " + orph)
+        if garbage:
+            print("Garbage objects:")
+            for g in garbage:
+                print("    " + g)
+
+    def cmd_push(self, push_all=False):
+        """
+        Push anything that I have stored and referenced
+        """
+        self.setup()
+        # Default to push only those objects referenced by current HEAD
+        # (includes history). Finer-grained pushing would be useful.
+        files = self.referenced_objects(all=push_all) & self.catalog_objects()
+        cmds = self.get_data_transfer_command(
+            direction=DataTransferDirection.PUSH,
+            files=files
+        )
+        total = len(cmds)
+        counter = 0
+        for cmd in cmds:
+            counter = counter + 1
+            self.verbose("Executing file {} of {}".format(counter, total))
+            self.verbose("Executing: %s" % " ".join(cmd))
+            p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+            p.communicate(input=b"\x00".join(tobytes(f) for f in files))
+            if p.returncode:
+                sys.exit(p.returncode)
+
+    def cmd_pull(self, pull_all=False, pull_args=None):
+        """
+        Pull anything that I have referenced, but not stored
+        """
+        self.setup()
+        refargs = dict()
+        if pull_args is None:
+            pull_args = []
+        if pull_all:
+            refargs["all"] = True
+        for arg in pull_args:
+            if arg.startswith("-") or len(arg) != 40:
+                continue
+            rev = self.revparse(arg)
+            if rev:
+                refargs["rev"] = rev
+        files = self.filter_objects(refargs, self.parse_pull_patterns(pull_args))
+        cmds = self.get_data_transfer_command(
+            direction=DataTransferDirection.PULL,
+            files=files
+        )
+        for cmd in cmds:
+            self.verbose("Executing: %s" % " ".join(cmd))
+            p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+            p.communicate(input=b"\x00".join(tobytes(f) for f in files))
+            if p.returncode:
+                sys.exit(p.returncode)
+        self.checkout()
+
+    def cmd_checkout(self):
+        self.checkout(show_orphans=True)
+
+    def cmd_gc(self):
+        garbage = self.catalog_objects() - self.referenced_objects()
+        print("Unreferenced objects to remove: %d" % len(garbage))
+        for obj in garbage:
+            fname = os.path.join(self.objdir, obj)
+            print("%10d %s" % (os.stat(fname).st_size, obj))
+            os.remove(fname)
+
+    def cmd_verify(self):
+        """Print details of git-fat objects with incorrect data hash"""
+        corrupted_objects = []
+        for obj in self.catalog_objects():
+            fname = os.path.join(self.objdir, obj)
+            h = hashlib.new("sha1")
+            for block in readblocks(open(fname, "rb")):
+                h.update(block)
+            expected_hash = obj.replace("/", "")
+            data_hash = h.hexdigest()
+            if expected_hash != data_hash:
+                corrupted_objects.append((expected_hash, data_hash))
+        if corrupted_objects:
+            print("Corrupted objects: %d" % len(corrupted_objects))
+            for expected_hash, data_hash in corrupted_objects:
+                print(
+                    "Found object stored with hash %s, but the hash of its content "
+                    "is actually %s" % (expected_hash, data_hash)
+                )
+            sys.exit(1)
+
+    def cmd_find(self, size_thresh):
+        blobsizes = dict(self.gen_large_blobs("--all", size_thresh))
         time0 = time.time()
         # Find all names assumed by large blobs (those in blobsizes)
         pathsizes = collections.defaultdict(lambda: set())
@@ -1010,9 +991,8 @@ class GitFat(object):
         revlist.wait()
         difftree.wait()
 
-    def cmd_index_filter(self, args):
-        manage_gitattributes = "--manage-gitattributes" in args
-        filelist = set(f.strip() for f in open(args[0]).readlines())
+    def cmd_index_filter(self, filelist_path, manage_gitattributes=False):
+        filelist = set(f.strip() for f in open(filelist_path).readlines())
         lsfiles = subprocess.Popen(["git", "ls-files", "-s"], stdout=subprocess.PIPE)
         updateindex = subprocess.Popen(
             ["git", "update-index", "--index-info"], stdin=subprocess.PIPE
@@ -1092,34 +1072,89 @@ class GitFat(object):
         updateindex.wait()
 
 
+def run_command(**kwargs):
+    fn = kwargs.pop('func').replace("-", "_")
+    gitfat = GitFat()
+    if not hasattr(gitfat, fn):
+        raise Exception("GitFat has no function called '%s'" % fn)
+    getattr(gitfat, fn)(**kwargs)
+
+
 if __name__ == "__main__":
-    fat = GitFat()
-    cmd = sys.argv[1] if len(sys.argv) > 1 else ""
-    if cmd == "filter-clean":
-        fat.cmd_filter_clean()
-    elif cmd == "filter-smudge":
-        fat.cmd_filter_smudge()
-    elif cmd == "init":
-        fat.cmd_init()
-    elif cmd == "status":
-        fat.cmd_status(sys.argv[2:])
-    elif cmd == "push":
-        fat.cmd_push(sys.argv[2:])
-    elif cmd == "pull":
-        fat.cmd_pull(sys.argv[2:])
-    elif cmd == "gc":
-        fat.cmd_gc()
-    elif cmd == "verify":
-        fat.cmd_verify()
-    elif cmd == "checkout":
-        fat.cmd_checkout(sys.argv[2:])
-    elif cmd == "find":
-        fat.cmd_find(sys.argv[2:])
-    elif cmd == "index-filter":
-        fat.cmd_index_filter(sys.argv[2:])
-    else:
-        print(
-            "Usage: git fat "
-            "[init|status|push|pull|gc|verify|checkout|find|index-filter]",
-            file=sys.stderr,
-        )
+
+    parser = argparse.ArgumentParser(
+        prog="git-fat",
+        argument_default=argparse.SUPPRESS,
+        description="A tool for managing large binary files in git repositories",
+    )
+    subparsers = parser.add_subparsers()
+
+    # init
+    parser_init = subparsers.add_parser("init", help="Initialize git-fat")
+    parser_init.set_defaults(func="cmd_init")
+
+    # filter-clean
+    parser_fc = subparsers.add_parser("filter-clean", help="For Git internal use")
+    parser_fc.set_defaults(func="cmd_filter_clean")
+
+    # filter-smudge
+    parser_fs = subparsers.add_parser("filter-smudge", help="For Git internal use")
+    parser_fs.set_defaults(func="cmd_filter_smudge")
+
+    # status
+    parser_status = subparsers.add_parser(
+        "status", help="Show tracked, orphan and stale objects"
+    )
+    parser_status.add_argument("--all", dest="show_all", action="store_true")
+    parser_status.set_defaults(func="cmd_status")
+
+    # push
+    parser_push = subparsers.add_parser(
+        "push", help="Push fat files to the git-fat remote server"
+    )
+    parser_push.add_argument("--all", dest="push_all", action="store_true")
+    parser_push.set_defaults(func="cmd_push")
+
+    # pull
+    parser_pull = subparsers.add_parser(
+        "pull", help="Pull fat files from the git-fat remote server"
+    )
+    parser_pull.add_argument("--all", dest="pull_all", action="store_true")
+    parser_pull.add_argument("pull_args", nargs="*")
+    parser_pull.set_defaults(func="cmd_pull")
+
+    # gc
+    parser_gc = subparsers.add_parser("gc", help="Remove local unreferenced objects")
+    parser_gc.set_defaults(func="cmd_gc")
+
+    # verify
+    parser_verify = subparsers.add_parser(
+        "verify", help="Show broken objects with invalid hash"
+    )
+    parser_verify.set_defaults(func="cmd_verify")
+
+    # checkout
+    parser_checkout = subparsers.add_parser("checkout", help="Restore orphaned objects")
+    parser_checkout.set_defaults(func="cmd_checkout")
+
+    # find
+    parser_find = subparsers.add_parser(
+        "find", help="Find all the objects larger than a threshold"
+    )
+    parser_find.add_argument("size_thresh", type=int, help="Threshold size in bytes")
+    parser_find.set_defaults(func="cmd_find")
+
+    # index-filter
+    parser_idxfilter = subparsers.add_parser(
+        "index-filter", help="git fat index-filter for filter-branch"
+    )
+    parser_idxfilter.add_argument(
+        "filelist_path", help="Path to the file containing the files to filter"
+    )
+    parser_idxfilter.add_argument("--manage-gitattributes", action="store_true")
+    parser_idxfilter.set_defaults(func="cmd_index_filter")
+
+    args = parser.parse_args()
+    kwargs = dict(vars(args))
+
+    run_command(**kwargs)

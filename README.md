@@ -328,5 +328,6 @@ It includes commit from other user, specifically:
 - Organization [@reedus-io](https://github.com/reedus-io), which contributed adding tests for S3, refactoring the test scripts and dockerizing them.  
 - Purdea Andrei [@purdeaandrei](https://github.com/purdeaandrei) improved the speed of the `git fat checkout` operation.
 - Guo Tang [@qigtang](https://github.com/qigtang) improved the scalability by storing the objects in sha1-prefixed directories, like Git does.
+- Organization [@ciena-blueplanet](https://github.com/ciena-blueplanet) improved several pieces of the application, the CLI interface.
 
 I want to personally thank all them for their valuable contributions.
