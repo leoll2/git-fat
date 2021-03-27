@@ -897,13 +897,17 @@ class GitFat(object):
             h = hashlib.new("sha1")
             for block in readblocks(open(fname, "rb")):
                 h.update(block)
+            expected_hash = obj.replace("/", "")
             data_hash = h.hexdigest()
-            if obj != data_hash:
-                corrupted_objects.append((obj, data_hash))
+            if expected_hash != data_hash:
+                corrupted_objects.append((expected_hash, data_hash))
         if corrupted_objects:
             print("Corrupted objects: %d" % len(corrupted_objects))
-            for obj, data_hash in corrupted_objects:
-                print("%s data hash is %s" % (obj, data_hash))
+            for expected_hash, data_hash in corrupted_objects:
+                print(
+                    "Found object stored with hash %s, but the hash of its content "
+                    "is actually %s" % (expected_hash, data_hash)
+                )
             sys.exit(1)
 
     def cmd_init(self):
