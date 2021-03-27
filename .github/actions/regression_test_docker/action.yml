@@ -1,0 +1,5 @@
+name: 'Dockerized regression tests'
+description: 'Run regression tests in a Docker container'
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
